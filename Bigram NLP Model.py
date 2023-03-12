@@ -39,19 +39,19 @@ for w in names:
 bigrams = sorted(bigrams.items(), key=lambda x: -x[1]) # sort according to bigram frequency
 
 
-# In[45]:
+# In[6]:
 
 
 N = torch.ones((27, 27), dtype=torch.int32)
 
 
-# In[46]:
+# In[7]:
 
 
 N
 
 
-# In[47]:
+# In[8]:
 
 
 # Instead of a dictionary, we are going to use a 2x2 matrix to store the results of the dataset.
@@ -59,7 +59,7 @@ N
 # defined below.
 
 
-# In[48]:
+# In[9]:
 
 
 alphabet = sorted(list(set(''.join(names))))
@@ -70,7 +70,7 @@ charToInt['.'] = 0
 intToChar = {i: c for c, i in charToInt.items()}
 
 
-# In[49]:
+# In[10]:
 
 
 for name in names:
@@ -82,7 +82,7 @@ for name in names:
         N[indexOne, indexTwo] += 1
 
 
-# In[50]:
+# In[11]:
 
 
 plt.figure(figsize=(16,16))
@@ -97,13 +97,13 @@ for i in range(27):
 plt.axis('off');
 
 
-# In[51]:
+# In[12]:
 
 
 probabilityDist = N.float() / N.sum(1, keepdim=True)
 
 
-# In[52]:
+# In[13]:
 
 
 g = torch.Generator().manual_seed(2147483647)
@@ -121,7 +121,7 @@ for i in range(20):
     print(''.join(out))
 
 
-# In[58]:
+# In[14]:
 
 
 # Introducing negative log likelihood 
@@ -147,14 +147,100 @@ negLoglikelihood = -logLikelihood
 print(negLoglikelihood / pairCount)
 
 
-# In[28]:
+# In[15]:
 
 
 print(names[0:10])
 
 
-# In[ ]:
+# In[21]:
 
 
+xs, ys = [], []
+
+for w in names[:1]:
+    chars = ['.'] + list(w) + ['.']
+    
+    for charOne, charTwo in zip(chars, chars[1:]):        
+        indexOne = charToInt[charOne]
+        indexTwo = charToInt[charTwo]
+        
+        xs.append(indexOne)
+        ys.append(indexTwo)
+        
+        print(charOne, charTwo)
+        
+xs = torch.tensor(xs)
+ys = torch.tensor(ys)
+
+print(xs, ys)
 
 
+# In[29]:
+
+
+import torch.nn.functional as F
+xEnc = F.one_hot(xs, num_classes=27).float()
+
+
+# In[31]:
+
+
+plt.imshow(xEnc, cmap='Blues')
+
+
+# In[117]:
+
+
+g = torch.Generator().manual_seed(2147483647)
+
+layer = torch.randn((27, 27), generator=g, requires_grad=True)
+
+
+# In[140]:
+
+
+# create dataset
+xs, ys = [], []
+
+for name in names:
+    characters = ['.'] + list(name) + ['.']
+    
+    for charOne, charTwo in zip(characters, characters[1:]):
+        xs.append(charToInt[charOne])
+        ys.append(charToInt[charTwo])
+
+inputs = torch.tensor(xs)
+outputs = torch.tensor(ys)
+
+datasetLength = len(inputs)
+
+
+# In[141]:
+
+
+inputsEncoded = F.one_hot(inputs, num_classes=27).float()
+outputsEncoded = F.one_hot(outputs, num_classes=27).float()
+
+
+# In[154]:
+
+
+for i in range(100):
+    
+    # forward pass
+    logits = inputsEncoded @ layer
+
+    probs = logits.exp()
+    normalised = probs / probs.sum(1, keepdims=True)
+    
+    negLogLikelihood = -normalised[torch.arange(datasetLength), outputs].log().mean()
+    print(negLogLikelihood.item())
+    
+    # backward pass
+    layer.grad = None
+    negLogLikelihood.backward()
+    
+    # update
+    layer.data += -50 * layer.grad
+    
